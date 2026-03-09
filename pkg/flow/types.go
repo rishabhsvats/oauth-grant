@@ -23,3 +23,17 @@ type DeviceResp struct {
 	Interval                int    `json:"interval"`
 	ExpiresIn               int    `json:"expires_in"`
 }
+
+type PKCEParams struct {
+	CodeVerifier  string
+	CodeChallenge string
+	State         string
+}
+
+type PKCEConfig struct {
+	PrivateKeyPath string
+	ClientID       string
+	RedirectURI    string
+	Scope          string
+	CodeChallengeMethod string
+}
