@@ -1,31 +1,76 @@
-# CLI to execute Device Authorization Grant Flow
+# grant
 
-OAuth Idenity Provider with Device Authorization Grant flow enabled, having Issuer : http://localhost:8080/realms/deviceflow and Client ID : device-test-client - we can run the CLI as follows:
+A CLI tool for testing OAuth 2.0 / OpenID Connect grant flows against Keycloak (or any OIDC-compliant issuer). It supports device authorization, authorization code with confidential client, and authorization code with PKCE and signed JWT.
 
-```
-$ go run cmd/oauth/main.go  -i http://localhost:8080/realms/deviceflow -c device-test-client -f device
-```
+## Build and run
 
-The sample response will be like following:
-
-```
-$ go run cmd/oauth/main.go  -i http://localhost:8080/realms/deviceflow -c device-test-client -f device
-
-Open link : http://localhost:8080/realms/deviceflow/device in browser and enter verification code APFN-HGMB
-
-Or open link : http://localhost:8080/realms/deviceflow/device?user_code=APFN-HGMB directly in the browser
-
-Code will be valid for 600 seconds
-
-Tokens received!
-Received response: {
- "access_token": "eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJXQUVVWGRTRWdtcEhrckFhRDVmeTBJQlhSc3ZlREZocFNKZUJ2R1AtWG9JIn0.eyJleHAiOjE3MTkzMTMzMDIsImlhdCI6MTcxOTMxMzAwMiwiYXV0aF90aW1lIjoxNzE5MzEyOTk4LCJqdGkiOiIxYmRjODY3Zi1kNTI1LTQ0YTItOTlkZS0xNjE0NTdkMDIwZTMiLCJpc3MiOiJodHRwOi8vbG9jYWxob3N0OjgwODAvcmVhbG1zL2RldmljZWZsb3ciLCJhdWQiOiJhY2NvdW50Iiwic3ViIjoiYTM4YjJjZDYtZDY3YS00Y2NkLWE4ZDAtN2Y5ZjQ0OWU3ZjRmIiwidHlwIjoiQmVhcmVyIiwiYXpwIjoiZGV2aWNlLXRlc3QtY2xpZW50Iiwic2lkIjoiMjhjYzkwMDYtOGI3Yy00OTBkLTk4ZWMtN2U3MjVkODM3YTY4IiwiYWNyIjoiMSIsImFsbG93ZWQtb3JpZ2lucyI6WyJodHRwOi8vbG9jYWxob3N0OjgwODAiXSwicmVhbG1fYWNjZXNzIjp7InJvbGVzIjpbIm9mZmxpbmVfYWNjZXNzIiwidW1hX2F1dGhvcml6YXRpb24iLCJkZWZhdWx0LXJvbGVzLWRldmljZWZsb3ciXX0sInJlc291cmNlX2FjY2VzcyI6eyJhY2NvdW50Ijp7InJvbGVzIjpbIm1hbmFnZS1hY2NvdW50IiwibWFuYWdlLWFjY291bnQtbGlua3MiLCJ2aWV3LXByb2ZpbGUiXX19LCJzY29wZSI6Im9wZW5pZCBlbWFpbCBwcm9maWxlIiwiZW1haWxfdmVyaWZpZWQiOmZhbHNlLCJuYW1lIjoicmlzaGFiaCBzaW5naCIsInByZWZlcnJlZF91c2VybmFtZSI6InJpc2hhYmgiLCJnaXZlbl9uYW1lIjoicmlzaGFiaCIsImZhbWlseV9uYW1lIjoic2luZ2giLCJlbWFpbCI6InJpc2hhYmhAZ21haWwuY29tIn0.Ln_IFSVI_LBQLNvGHRfgBUgDTI_X1dK-86bS9dtfl2tNgk8KH8x1x0a5oTPOy4jR1Ph7LXpV5FJYXIB05KPYhftoJtrsvBsx4uPL9tVB1CQZi89N2j-ChtwKc8DP2rDaAN7ej8ts_cFY6loX0Tx34puKl-WnBVr3ScHsG65PIsK066_8fFx86iiJg7ENaw6u2uNEwhSWqrfyKK-1AgJTnoWH_G_tnV3rc5RCVhUCSsyP1x-p_ddokSnjgc-xdCNVH93S-inuAgO5TnRhm6_m9EYvxXJXa3VoMxXZo7M3yQXyUIb8A-ibRINlxa2GcJPoHczcpdrY5hEkhUUXEiUi-A",
- "token_type": "Bearer",
- "refresh_token": "eyJhbGciOiJIUzUxMiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJlNTNlZDMyZC0zZDU2LTQ1YWItYWI0ZC1kMTExZjU3MzlhZmYifQ.eyJleHAiOjE3MTkzMTQ4MDIsImlhdCI6MTcxOTMxMzAwMiwianRpIjoiNTg3YWViNmEtNTQ4Mi00MDQ2LWI1NzctZGI1NGMzY2M0YjAyIiwiaXNzIjoiaHR0cDovL2xvY2FsaG9zdDo4MDgwL3JlYWxtcy9kZXZpY2VmbG93IiwiYXVkIjoiaHR0cDovL2xvY2FsaG9zdDo4MDgwL3JlYWxtcy9kZXZpY2VmbG93Iiwic3ViIjoiYTM4YjJjZDYtZDY3YS00Y2NkLWE4ZDAtN2Y5ZjQ0OWU3ZjRmIiwidHlwIjoiUmVmcmVzaCIsImF6cCI6ImRldmljZS10ZXN0LWNsaWVudCIsInNpZCI6IjI4Y2M5MDA2LThiN2MtNDkwZC05OGVjLTdlNzI1ZDgzN2E2OCIsInNjb3BlIjoib3BlbmlkIGVtYWlsIGJhc2ljIHdlYi1vcmlnaW5zIGFjciBwcm9maWxlIHJvbGVzIn0.0ko6-LOJAYs8m5a0ug-DQyqiuT3N8G5OvBboowRev22LJMp6g2zyVEzg5WxJ5ITO43LJeHKnSxHJJ5P85fiADQ",
- "expires_in": 300,
- "id_token": "eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJXQUVVWGRTRWdtcEhrckFhRDVmeTBJQlhSc3ZlREZocFNKZUJ2R1AtWG9JIn0.eyJleHAiOjE3MTkzMTMzMDIsImlhdCI6MTcxOTMxMzAwMiwiYXV0aF90aW1lIjoxNzE5MzEyOTk4LCJqdGkiOiI5NTIzZDdhYi0yYWYzLTRiZDctYWQ3Yi0yYWRmMzhhY2U0MjkiLCJpc3MiOiJodHRwOi8vbG9jYWxob3N0OjgwODAvcmVhbG1zL2RldmljZWZsb3ciLCJhdWQiOiJkZXZpY2UtdGVzdC1jbGllbnQiLCJzdWIiOiJhMzhiMmNkNi1kNjdhLTRjY2QtYThkMC03ZjlmNDQ5ZTdmNGYiLCJ0eXAiOiJJRCIsImF6cCI6ImRldmljZS10ZXN0LWNsaWVudCIsInNpZCI6IjI4Y2M5MDA2LThiN2MtNDkwZC05OGVjLTdlNzI1ZDgzN2E2OCIsImF0X2hhc2giOiJVc1BHc3R3Y3AzNDYyRklmblZoSWZRIiwiYWNyIjoiMSIsImVtYWlsX3ZlcmlmaWVkIjpmYWxzZSwibmFtZSI6InJpc2hhYmggc2luZ2giLCJwcmVmZXJyZWRfdXNlcm5hbWUiOiJyaXNoYWJoIiwiZ2l2ZW5fbmFtZSI6InJpc2hhYmgiLCJmYW1pbHlfbmFtZSI6InNpbmdoIiwiZW1haWwiOiJyaXNoYWJoQGdtYWlsLmNvbSJ9.AzKQrek5f7e2K_vknYLO9BrNOOek_ShcisGWGWJEBKUHMsVQcW57R1g3iuqPQzRrot0Bg6KTRalJAtaeN5o0p73vqZ5eWxVKRpjmmYpk9igC8JYWo6MJKqQ-RIFJxKFoe1TI9gAdBxWuNrZMwJF38Z1gDaKtiMg4eDTzH30m58KrrZycDc7-J0LmDDWRDXse0nlLIIReEwvLioODN8l2BIItO0T2vaC9rxzGHE0ruYQulFil6BG2eGHxGcwYXAZcLlwCDBZLMbmW8gmFnDJP1ghFMxbi-11OxemkrCRomU_1dkkF8phkyBajS4cLjRr7bKFj7VokRGdjKTNK4IHfhQ",
- "error": ""
-}
+```bash
+go build -o grant ./cmd/oauth
+./grant --issuer <issuer-url> --client_id <client-id> --grant_type <flow>
 ```
 
-Refer linked [blog](https://medium.com/@rishabhsvats/developing-golang-cli-to-test-device-authorization-grant-with-keycloak-6e0e6e6dfe82) for more details about Device authorization grant and implementation of this project.
+Short form: `-i` (issuer), `-c` (client_id), `-f` (grant_type).
+
+**Issuer** is your OIDC issuer URL (e.g. `https://keycloak.example.com/realms/my-realm`). **Grant type** is one of: `device`, `authcode`, `pkce`.
+
+---
+
+## Flows overview
+
+| Flow        | Flag       | Client type    | Use case |
+|------------|------------|----------------|----------|
+| **Device** | `device`   | Public         | CLI / devices without a browser; user signs in elsewhere with a code. |
+| **Auth code (confidential)** | `authcode` | Confidential | Standard browser redirect flow with `client_id` + `client_secret`. |
+| **PKCE + signed JWT** | `pkce` | Confidential (JWT) | Browser redirect with PKCE and client authentication via signed JWT (no shared secret). |
+
+Each flow has a dedicated README with setup and usage.
+
+---
+
+### Device flow (`device`)
+
+[RFC 8628](https://datatracker.ietf.org/doc/html/rfc8628) device authorization grant. No client secret or redirect URI. The tool prints a verification URL and user code; you complete sign-in in a browser; the tool polls until tokens are returned. Suited for CLIs and headless devices.
+
+```bash
+grant -f device -i <issuer> -c <client-id>
+```
+
+→ **[README-device.md](README-device.md)** — Keycloak setup, usage, examples.
+
+---
+
+### Authorization code — confidential client (`authcode`)
+
+Classic authorization code flow with a **confidential** client. You set `OAUTH_CLIENT_SECRET`; the tool opens a local callback server, prints the auth URL, and exchanges the code for tokens using `client_id` and `client_secret`.
+
+```bash
+export OAUTH_CLIENT_SECRET="your-secret"
+grant -f authcode -i <issuer> -c <client-id>
+```
+
+→ **[README-authcode.md](README-authcode.md)** — Keycloak setup, env vars, usage.
+
+---
+
+### Authorization code — PKCE + signed JWT (`pkce`)
+
+Authorization code flow with **PKCE** (S256) and client authentication by **signed JWT** (RSA key pair). No client secret; you set `OAUTH_PRIVATE_KEY_PATH` and configure the matching public key in Keycloak.
+
+```bash
+export OAUTH_PRIVATE_KEY_PATH=/path/to/private-key.pem
+grant -f pkce -i <issuer> -c <client-id>
+```
+
+→ **[README-pkce.md](README-pkce.md)** — Key export, Keycloak client config, env vars, troubleshooting.
+
+---
+
+## Quick reference
+
+| Flow     | Required env (besides CLI) | Keycloak |
+|----------|----------------------------|----------|
+| `device` | —                          | Device authorization enabled; public client. |
+| `authcode` | `OAUTH_CLIENT_SECRET`    | Confidential client; redirect URI. |
+| `pkce`   | `OAUTH_PRIVATE_KEY_PATH`   | Client with PKCE + public key for JWT. |
+
+For optional env (e.g. `OAUTH_REDIRECT_URI`, `OAUTH_SCOPE`), see the flow-specific READMEs.

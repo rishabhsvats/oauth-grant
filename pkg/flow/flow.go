@@ -31,6 +31,8 @@ func OauthFlow(issuer, clientID, flow string) (string, error) {
 		token, err = GetDeviceFlowToken(provider, clientID)
 	case "pkce":
 		token, err = GetPKCEFlowToken(provider, clientID)
+	case "authcode":
+		token, err = GetAuthCodeConfidentialFlowToken(provider, clientID)
 	default:
 		return "", fmt.Errorf("unsupported oauth flow: %s", flow)
 	}
@@ -225,6 +227,110 @@ func GenerateSignedJWT(privateKey *rsa.PrivateKey, issuer, clientID, tokenEndpoi
 	}
 
 	return signedToken, nil
+}
+
+// GetAuthCodeConfidentialFlowToken implements the authorization code flow for
+// a Keycloak confidential client using client_id and client_secret (no PKCE).
+func GetAuthCodeConfidentialFlowToken(provider *OauthProvider, clientID string) (string, error) {
+	clientSecret := os.Getenv("OAUTH_CLIENT_SECRET")
+	if clientSecret == "" {
+		return "", fmt.Errorf("OAUTH_CLIENT_SECRET environment variable must be set for confidential client")
+	}
+
+	redirectURI := os.Getenv("OAUTH_REDIRECT_URI")
+	if redirectURI == "" {
+		redirectURI = "http://localhost:8080/callback"
+	}
+
+	scope := os.Getenv("OAUTH_SCOPE")
+	if scope == "" {
+		scope = "openid email"
+	}
+
+	state, err := GenerateState()
+	if err != nil {
+		return "", fmt.Errorf("failed to generate state: %w", err)
+	}
+
+	authURL := buildAuthorizationURLConfidential(provider.AuthorizationEndpoint, clientID, redirectURI, scope, state)
+
+	fmt.Printf("\nPlease open the following URL in your browser:\n%s\n\n", authURL)
+	fmt.Println("Waiting for authorization code...")
+
+	authCode, err := receiveAuthorizationCode(redirectURI, state)
+	if err != nil {
+		return "", fmt.Errorf("failed to receive authorization code: %w", err)
+	}
+
+	fmt.Printf("\nAuthorization code received: %s\n", authCode)
+
+	token, err := exchangeCodeForTokenConfidential(provider.TokenEndpoint, clientID, clientSecret, authCode, redirectURI)
+	if err != nil {
+		return "", fmt.Errorf("failed to exchange code for token: %w", err)
+	}
+
+	return token, nil
+}
+
+// buildAuthorizationURLConfidential builds the authorization URL for the confidential client flow (no PKCE).
+func buildAuthorizationURLConfidential(authEndpoint, clientID, redirectURI, scope, state string) string {
+	u, _ := url.Parse(authEndpoint)
+	params := url.Values{}
+	params.Add("response_type", "code")
+	params.Add("client_id", clientID)
+	params.Add("redirect_uri", redirectURI)
+	params.Add("scope", scope)
+	params.Add("state", state)
+	u.RawQuery = params.Encode()
+	return u.String()
+}
+
+// exchangeCodeForTokenConfidential exchanges the authorization code for tokens using client_id and client_secret.
+func exchangeCodeForTokenConfidential(tokenEndpoint, clientID, clientSecret, authCode, redirectURI string) (string, error) {
+	values := url.Values{}
+	values.Add("grant_type", "authorization_code")
+	values.Add("client_id", clientID)
+	values.Add("client_secret", clientSecret)
+	values.Add("code", authCode)
+	values.Add("redirect_uri", redirectURI)
+
+	resp, err := http.PostForm(tokenEndpoint, values)
+	if err != nil {
+		return "", fmt.Errorf("failed to request token: %w", err)
+	}
+	defer resp.Body.Close()
+
+	b, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to read response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		var errorResp map[string]interface{}
+		if err := json.Unmarshal(b, &errorResp); err == nil {
+			if errorDesc, ok := errorResp["error_description"].(string); ok {
+				return "", fmt.Errorf("token request failed with status %d: %s - %s", resp.StatusCode, errorResp["error"], errorDesc)
+			}
+		}
+		return "", fmt.Errorf("token request failed with status %d: %s", resp.StatusCode, string(b))
+	}
+
+	var otr OIDCTokenResponse
+	if err := json.Unmarshal(b, &otr); err != nil {
+		return "", fmt.Errorf("failed to unmarshal token response: %w", err)
+	}
+
+	if otr.Error != "" {
+		return "", fmt.Errorf("token response error: %s", otr.Error)
+	}
+
+	fmt.Println("\nTokens received!")
+	val, err := json.MarshalIndent(otr, "", "  ")
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal token response: %w", err)
+	}
+
+	return string(val), nil
 }
 
 // GetPKCEFlowToken implements the PKCE flow with signed JWT authentication
